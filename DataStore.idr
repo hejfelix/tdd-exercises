@@ -55,13 +55,15 @@ getEntry pos dstore =
              (Just id) => Just (index id storeItems ++ "\n", dstore)
 
 
-searchFor : (dstore : DataStore) -> (str : String) -> DataStore -> String
-searchFor dstore str (MkData _ items) = show (filter (isInfixOf str) items)
+searchFor : (str : String) -> DataStore -> String
+searchFor str (MkData _ items) =
+  let matches = filter (isInfixOf str) items
+    in ?blu
 
 total processInput : DataStore -> String -> Maybe (String, DataStore)
 processInput dstore input = case parse input of
      Nothing              => Just ("Invalid command\n", dstore)
-     (Just (Search str))  => Just(searchFor dstore str dstore ++ "\n", dstore)
+     (Just (Search str))  => Just(searchFor str dstore ++ "\n", dstore)
      (Just (Size))        => Just (show (size dstore) ++ " \n", dstore)
      (Just (Add item))    =>
         Just ("Added item: " ++ show (size dstore) ++ "\n", addToStore dstore item)
