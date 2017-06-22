@@ -9,11 +9,13 @@ infixr 5 .+.
 data Schema =
     SString
   | SInt
+  | SChar
   | (.+.) Schema Schema
 
 SchemaType : Schema -> Type
 SchemaType SString    = String
 SchemaType SInt       = Int
+SchemaType SChar      = Char
 SchemaType (x .+. y)  = (SchemaType x, SchemaType y)
 
 record DataStore where
@@ -50,8 +52,9 @@ addToStore (MkData schema size items) newItem = MkData schema _ (addToData items
 display : SchemaType schema -> String
 display {schema = SString} item = show item
 display {schema = SInt} item = show item
-display {schema = (x .+. y)} (iteml, itemr)
-    = display iteml ++ ", " ++ display itemr
+display {schema = SChar} item = show item
+display {schema = (y .+. z)} (iteml, itemr) = display iteml ++ ", " ++
+                                              display itemr
 
 getEntry : (pos : Integer) -> (dstore : DataStore) -> Maybe (String, DataStore)
 getEntry pos dstore =
@@ -72,7 +75,10 @@ parsePrefix SString input = getQuoted (unpack input)
 parsePrefix SInt item = case span isDigit item of
     ("", rest)  => Nothing
     (num, rest) => Just (cast num, ltrim rest)
-parsePrefix (left .+. right) input = case parsePrefix left input of
+parsePrefix SChar str               = case unpack str of
+    head :: rest => Just (head, ltrim (pack rest))
+    []           => Nothing
+parsePrefix (left .+. right) input  = case parsePrefix left input of
     Nothing => Nothing
     Just (leftResult, input') =>
       case parsePrefix right input' of
@@ -86,6 +92,12 @@ parseBySchema schema input = case parsePrefix schema input of
     Nothing        => Nothing
 
 parseSchema : List String -> Maybe Schema
+parseSchema ("Char" :: xs)
+    = case xs of
+           [] => Just SChar
+           _  => case parseSchema xs of
+                    Nothing => Nothing
+                    Just xs_sch => Just (SChar .+. xs_sch)
 parseSchema ("String" :: xs)
     = case xs of
            [] => Just SString
