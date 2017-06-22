@@ -2,7 +2,6 @@ module Main
 
 import Data.Vect
 
--- %default total
 
 infixr 5 .+.
 
@@ -27,20 +26,8 @@ record DataStore where
 data Command : Schema -> Type where
   SetSchema : (newschema : Schema) -> Command schema
   Add       : SchemaType schema -> Command schema
-  Get       : Integer -> Command schema
+  Get       : Maybe Integer -> Command schema
   Quit      : Command schema
-
-{-
-
-
-
-size : DataStore -> Nat
-size (MkData size' _) = size'
-
-items : (store : DataStore) -> Vect (size store) String
-items (MkData _ items') = items'
-
--}
 
 addToStore : (items: DataStore) -> SchemaType (schema items) -> DataStore
 addToStore (MkData schema size items) newItem = MkData schema _ (addToData items)
@@ -78,51 +65,46 @@ parsePrefix SInt item = case span isDigit item of
 parsePrefix SChar str               = case unpack str of
     head :: rest => Just (head, ltrim (pack rest))
     []           => Nothing
-parsePrefix (left .+. right) input  = case parsePrefix left input of
-    Nothing => Nothing
-    Just (leftResult, input') =>
-      case parsePrefix right input' of
-        Nothing => Nothing
-        Just (rightResult, input'') => Just ((leftResult, rightResult), input'')
+parsePrefix (left .+. right) input = do
+  (leftResult, input')    <- parsePrefix left input
+  (rightResult, input'')  <- parsePrefix right input'
+  Just ((leftResult,rightResult), input'')
+
 
 parseBySchema : (schema : Schema) -> String -> Maybe (SchemaType schema)
-parseBySchema schema input = case parsePrefix schema input of
-    Just (res, "") => Just res
-    Just _         => Nothing
-    Nothing        => Nothing
+parseBySchema schema input =
+  do
+    (res, "") <- parsePrefix schema input
+    Just res
 
 parseSchema : List String -> Maybe Schema
 parseSchema ("Char" :: xs)
     = case xs of
            [] => Just SChar
-           _  => case parseSchema xs of
-                    Nothing => Nothing
-                    Just xs_sch => Just (SChar .+. xs_sch)
+           _  => do   xs_sch <- parseSchema xs
+                      Just (SChar .+. xs_sch)
 parseSchema ("String" :: xs)
     = case xs of
            [] => Just SString
-           _ => case parseSchema xs of
-                     Nothing => Nothing
-                     Just xs_sch => Just (SString .+. xs_sch)
+           _ => do    xs_sch <- parseSchema xs
+                      Just (SString .+. xs_sch)
 parseSchema ("Int" :: xs)
     = case xs of
            [] => Just SInt
-           _ => case parseSchema xs of
-                     Nothing => Nothing
-                     Just xs_sch => Just (SInt .+. xs_sch)
+           _ => do    xs_sch <- parseSchema xs
+                      Just (SInt .+. xs_sch)
 parseSchema _ = Nothing
 
 parseCommand : (schema : Schema) -> String -> String -> Maybe (Command schema)
-parseCommand schema "add" rest      = case parseBySchema schema rest of
-                                        Nothing => Nothing
-                                        Just restok => Just (Add restok)
+parseCommand schema "add" rest      = do  restok <- parseBySchema schema rest
+                                          Just (Add restok)
 parseCommand schema "quit" _        = Just Quit
+parseCommand schema "get" ""        = Just (Get Nothing)
 parseCommand schema "get" val       = case all isDigit (unpack val) of
                                         False => Nothing
-                                        True => Just (Get (cast val))
-parseCommand schema "schema" rest   = case parseSchema (words rest) of
-                                        Nothing => Nothing
-                                        Just schemaok => Just (SetSchema schemaok)
+                                        True => Just (Get (Just (cast val)))
+parseCommand schema "schema" rest   = do  schemaok <- parseSchema (words rest)
+                                          Just (SetSchema schemaok)
 parseCommand _ _ _                  = Nothing
 
 parse : (schema: Schema) -> (input : String) -> Maybe (Command schema)
@@ -135,13 +117,18 @@ setSchema store schema = case size store of
     Z => Just (MkData schema _ [])
     S k => Nothing
 
+showAll : Nat -> Vect size (SchemaType schema) -> String
+showAll idx [] = ""
+showAll idx (x :: xs) = show idx ++ ": " ++ display x ++ "\n" ++
+                        showAll (idx + 1) xs
 
 total processInput : DataStore -> String -> Maybe (String, DataStore)
 processInput dstore input = case parse (schema dstore) input of
     Nothing                   => Just ("Invalid command\n", dstore)
     Just (Add item)           =>
        Just ("Added item: " ++ show (size dstore) ++ "\n", addToStore dstore item)
-    Just (Get pos)            => getEntry pos dstore
+    Just (Get (Just pos))     => getEntry pos dstore
+    Just (Get Nothing)        => Just (showAll 0 (items dstore) ++ "\n", dstore)
     Just (SetSchema schema')  => case setSchema dstore schema' of
       Nothing     => Just ("Can't update schema\n", dstore)
       Just dstore' => Just ("OK\n", dstore')
@@ -149,24 +136,3 @@ processInput dstore input = case parse (schema dstore) input of
 
 main : IO ()
 main = replWith (MkData (SString .+. SString .+. SInt) _ []) "Command: " processInput
-{-
-
-
-
-
-
-
-
-
-searchString : Nat -> (items : Vect n String) -> (str : String) -> String
-searchString idx [] str = ""
-searchString idx (x :: xs) str
-   = let rest = searchString (idx + 1) xs str in
-     if isInfixOf str x
-        then show idx ++ ": " ++ x ++ "\n" ++ rest
-        else rest
-
-
-
-
--}
