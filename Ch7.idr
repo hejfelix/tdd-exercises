@@ -29,3 +29,28 @@ Show num => Show (Expr num) where
 
 (Neg num, Integral num, Eq num) => Eq (Expr num) where
   (==) x y = eval x == eval y
+
+(Neg num, Integral num) => Cast (Expr num) num where
+  cast exp = eval exp
+
+Functor Expr where
+  map func (Val x)   = Val (func x)
+  map func (Add x y) = Add (map func x) (map func y)
+  map func (Sub x y) = Sub (map func x) (map func y)
+  map func (Mul x y) = Mul (map func x) (map func y)
+  map func (Div x y) = Div (map func x) (map func y)
+  map func (Abs x)   = Abs (map func x)
+
+data Vect : Nat -> Type -> Type where
+     Nil : Vect Z a
+     (::) : a -> Vect k a -> Vect (S k) a
+
+%name Vect xs, ys
+
+Eq a => Eq (Vect n a) where
+  (==) [] [] = True
+  (==) (x :: xs) (y :: ys) = x == y && xs == ys
+
+Foldable (Vect n) where
+  foldr func init [] = init
+  foldr func init (x :: xs) = func x (foldr func init xs)
