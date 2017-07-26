@@ -54,3 +54,5 @@ Eq a => Eq (Vect n a) where
 Foldable (Vect n) where
   foldr func init [] = init
   foldr func init (x :: xs) = func x (foldr func init xs)
+
+  
