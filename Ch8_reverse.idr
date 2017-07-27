@@ -35,7 +35,6 @@ myReverse xs = reverse' [] xs
     reverse' acc (x :: xs)  = reverseProof_xs (reverse' (x :: acc) xs)
 
 
-
 -- base case:
 --                   0 + m = m + 0 = m
 --                   0 + m = m is given by prelude definition
